@@ -47,15 +47,21 @@ class Action:
         self.path.write_text(self.content, encoding="utf-8")
 
 
-def server_command(use_uv: bool) -> tuple[str, list[str]]:
+def server_command(use_uv: bool, scope: Path) -> tuple[str, list[str]]:
     """How the assistant should launch the server.
 
     ``uv run`` keeps the server pinned to this repo's locked environment; a
     bare ``recall`` assumes the package is installed on PATH.
+
+    ``--directory`` is omitted when installing into the Recall repo itself, so
+    the generated config stays portable and committable — an absolute path
+    would leak the author's home directory and break on every other machine.
     """
-    if use_uv:
-        return "uv", ["--directory", str(REPO), "run", "recall"]
-    return "recall", []
+    if not use_uv:
+        return "recall", []
+    if scope == REPO:
+        return "uv", ["run", "recall"]
+    return "uv", ["--directory", str(REPO), "run", "recall"]
 
 
 # ---------------------------------------------------------------------------
@@ -65,7 +71,7 @@ def server_command(use_uv: bool) -> tuple[str, list[str]]:
 
 def plan_claude(vault: str | None, scope: Path, use_uv: bool) -> list[Action]:
     """Claude Code: .mcp.json, .claude/skills/, .claude/commands/."""
-    command, args = server_command(use_uv)
+    command, args = server_command(use_uv, scope)
     entry: dict[str, object] = {"command": command, "args": args}
     if vault:
         entry["env"] = {"RECALL_VAULT_PATH": vault}
@@ -95,7 +101,7 @@ def plan_claude(vault: str | None, scope: Path, use_uv: bool) -> list[Action]:
 
 def plan_opencode(vault: str | None, scope: Path, use_uv: bool) -> list[Action]:
     """OpenCode: opencode.json, .opencode/commands/, AGENTS.md."""
-    command, args = server_command(use_uv)
+    command, args = server_command(use_uv, scope)
     entry: dict[str, object] = {"type": "local", "command": [command, *args], "enabled": True}
     if vault:
         entry["environment"] = {"RECALL_VAULT_PATH": vault}
@@ -127,7 +133,7 @@ def plan_codex(vault: str | None, scope: Path, use_uv: bool) -> list[Action]:
     ``~/.codex/prompts``), so the commands install globally even when the MCP
     registration is project-scoped.
     """
-    command, args = server_command(use_uv)
+    command, args = server_command(use_uv, scope)
     lines = [
         "[mcp_servers.recall]",
         f'command = "{command}"',
@@ -191,8 +197,8 @@ def _agents_md() -> str:
     )
 
 
-def _check_environment(use_uv: bool) -> None:
-    command, _ = server_command(use_uv)
+def _check_environment(use_uv: bool, scope: Path) -> None:
+    command, _ = server_command(use_uv, scope)
     if shutil.which(command) is None:
         print(
             f"  ! '{command}' is not on PATH — the assistant will not be able "
@@ -246,7 +252,7 @@ def main() -> int:
     scope = args.scope.expanduser().resolve()
     use_uv = not args.no_uv
 
-    _check_environment(use_uv)
+    _check_environment(use_uv, scope)
 
     for provider in targets:
         actions = PLANNERS[provider](vault, scope, use_uv)
