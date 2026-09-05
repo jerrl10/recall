@@ -1,101 +1,202 @@
 # Recall
 
-A local-first MCP server that turns AI-assisted engineering conversations into durable, structured engineering knowledge — and makes that knowledge retrievable in future AI sessions.
+**Durable engineering memory for AI coding assistants.**
 
-Recall is not an Obsidian automation tool and not an LLM application. Your AI client (Claude Code, OpenCode, Codex) already understands the conversation and decides what is worth remembering. Recall stores it, indexes it, tracks its lifecycle, and projects it into readable Markdown.
+You solve a hard problem with an AI assistant on Tuesday. On Friday the context
+window is gone, the session is closed, and the reasoning went with it.
+
+Recall is an [MCP](https://modelcontextprotocol.io/) server that turns those
+conversations into structured notes in your Obsidian vault — and hands them
+back to your assistant the next time they matter.
+
+```text
+you: "this visibility timeout thing is important — save it"
+       │
+       ▼
+  /learn  ──▶  Recall MCP  ──▶  Obsidian vault
+                                 ├── Concepts/Visibility Timeout.md
+                                 └── Daily/2026-09-05.md
+       │
+       ▼
+  next session: /recall  ──▶  the knowledge is back in context
+```
+
+Works with **Claude Code**, **Codex**, and **OpenCode** from one shared
+configuration.
+
+---
+
+## Why
+
+Most AI memory tools store conversation history. Recall stores *conclusions*.
+
+- **Your notes, your files.** Plain Markdown in your own Obsidian vault. No
+  database, no lock-in, no service. Delete Recall tomorrow and every note still
+  opens.
+- **Structured, not dumped.** Each note is classified, templated by kind, tagged,
+  cross-linked, and logged to a daily timeline.
+- **Merges instead of duplicating.** Capturing the same subject twice extends
+  the existing note rather than scattering near-duplicates across the vault.
+- **Provider-neutral.** One canonical skill and command set, installed into
+  whichever assistants you use.
+- **No LLM inside the server.** Your assistant already has the conversation and
+  does the reasoning. Recall does storage, structure, and retrieval — so it
+  needs no API key and makes no network calls.
+
+## What a captured note looks like
+
+````markdown
+---
+title: Azure Storage Queue visibility timeout
+kind: concept
+created: 2026-09-05
+updated: 2026-09-05
+tags:
+  - azure
+  - queue
+  - distributed-systems
+projects:
+  - recall
+source: claude-code
+---
+
+# Azure Storage Queue visibility timeout
+
+> [!summary]
+> A dequeued message is hidden from other consumers for a set window,
+> not deleted.
 
 ## How it works
 
-```text
-AI client session
-        ↓  /learn
-Recall MCP tools
-        ↓
-SQLite  (authoritative state + FTS5 search)
-        ↓
-Obsidian Markdown  (human-readable projection)
+Dequeue hides the message for the visibility timeout. Delete it explicitly
+or it reappears.
 
-        ↑  memory_context
-   next session reads it back
+## Gotchas
+
+Slow consumers cause duplicate processing.
+
+## Related
+
+- [[Idempotency]]
+````
+
+Obsidian-native throughout: frontmatter properties, callouts, wiki links, tags.
+
+---
+
+## Install
+
+Requires Python 3.12+, [uv](https://docs.astral.sh/uv/), and an existing
+Obsidian vault.
+
+```bash
+git clone https://github.com/jerrl10/recall.git
+cd recall
+uv sync
 ```
 
-- **SQLite is the source of truth.** A memory's identity is a UUIDv7, never a filename.
-- **Obsidian is a projection.** Files are re-rendered from authoritative state; a failed write never corrupts a committed memory.
-- **No LLM inside the server.** No API key, no provider dependency, no network.
+Then install into your assistant — run this from the project you want memory in:
+
+```bash
+# Claude Code
+python scripts/install.py claude --vault ~/Documents/Obsidian/MyVault
+
+# Codex
+python scripts/install.py codex --vault ~/Documents/Obsidian/MyVault
+
+# OpenCode
+python scripts/install.py opencode --vault ~/Documents/Obsidian/MyVault
+
+# or all three
+python scripts/install.py all --vault ~/Documents/Obsidian/MyVault
+```
+
+Add `--dry-run` to see exactly what would be written first. Existing MCP
+configuration is merged, not overwritten.
+
+Restart your assistant, then confirm the connection by asking it to run
+`vault_health`.
+
+## Use
+
+| Command | Does |
+| --- | --- |
+| `/learn` | Extract everything worth keeping from this conversation |
+| `/recall` | Pull relevant prior knowledge back into context |
+| `/decision` | Record an architectural decision and its trade-offs |
+| `/lesson` | Record a debugging or operational lesson |
+
+Or just say it: *"this is worth remembering — save it to my notes."* The skill
+picks it up.
+
+## Vault layout
+
+```text
+YourVault/
+└── Recall/
+    ├── Concepts/     mechanisms, terminology, reusable ideas
+    ├── Decisions/    choices made, and what they rule out
+    ├── Lessons/      what broke, why, and the fix
+    ├── Questions/    open threads worth returning to
+    ├── Projects/     durable per-project context
+    └── Daily/        dated log linking each day's captures
+```
+
+Topic notes hold the knowledge; the daily log gives you the timeline. Recall
+only ever writes beneath its own folder.
+
+## Configuration
+
+Set via environment or a `.env` file — see [`.env.example`](.env.example).
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `RECALL_VAULT_PATH` | *required* | Path to your Obsidian vault |
+| `RECALL_ROOT` | `Recall` | Folder inside the vault that Recall owns |
+| `RECALL_DAILY_FOLDER` | `Daily` | Subfolder for dated logs |
+| `RECALL_MAX_SEARCH_RESULTS` | `10` | Default result cap |
+| `RECALL_EXCERPT_CHARS` | `320` | Search excerpt length |
+
+Recall creates its own folder inside an existing vault. It never creates a
+vault, and never writes outside `RECALL_ROOT`.
 
 ## MCP tools
 
 | Tool | Purpose |
 | --- | --- |
-| `memory_health` | Server, schema, index, and projection status |
-| `memory_capture` | Persist one already-extracted memory |
-| `memory_update` | Amend a memory or move it through its lifecycle |
-| `memory_get` | Fetch one memory by stable ID |
-| `memory_recall` | Ranked, filtered search over the corpus |
-| `memory_context` | A bounded, provenance-tagged bundle for injection |
+| `note_capture` | Write a note, or fold new material into an existing one |
+| `note_search` | Ranked search across the vault, with excerpts |
+| `note_read` | Read one note in full |
+| `note_context` | Assemble relevant prior knowledge for the current task |
+| `vault_health` | Verify configuration, reachability, and note counts |
 
-Memories are classified as `concept`, `decision`, `lesson`, `question`, or `project_context`, and carry a status of `active`, `superseded`, `disputed`, or `archived`. Knowledge is superseded, not overwritten.
+## How it works
 
-## Requirements
+Markdown files are the source of truth. There is no database and no index to
+rebuild — every search walks the vault and ranks in memory, so a note you edit
+by hand in Obsidian is simply the current state.
 
-- Python 3.12+
-- [`uv`](https://docs.astral.sh/uv/)
-- A SQLite build with FTS5 (checked at startup)
-- An existing Obsidian vault, if you want the Markdown projection
-
-## Setup
-
-```bash
-uv sync
-```
-
-Configure via environment or `.env` (see `.env.example`):
-
-```dotenv
-RECALL_DB_PATH=~/.recall/recall.db
-RECALL_OBSIDIAN_VAULT_PATH=~/Documents/Obsidian/MyVault
-RECALL_OBSIDIAN_ROOT=Recall
-```
-
-Recall creates its own database and its own root folder inside an existing vault. It never creates a vault.
-
-### Connecting a client
-
-Recall speaks plain MCP over stdio — any compliant client works. Claude Code is the reference client, registered per-project via a committed `.mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "recall": {
-      "command": "uv",
-      "args": ["run", "recall"],
-      "env": {}
-    }
-  }
-}
-```
-
-Vault paths stay in the environment, not in that file. Call `memory_health` after connecting — it reports schema version, FTS5 availability, and whether the projection root is reachable.
-
-The `/learn` capture workflow lives in `.claude/skills/learn/`, version-controlled next to the server it drives.
-
-### A note on the Obsidian files
-
-Projected Markdown is **written by Recall and re-rendered from SQLite**. Editing a note inside Obsidian works, but your edit is overwritten the next time that memory is updated. SQLite is the source of truth; the vault is a view of it. Reading, linking, and searching in Obsidian are all fine.
-
-No Obsidian API key, plugin, or running app is required — a vault is a folder of Markdown files.
+That is a deliberate trade: ranked search is weaker than a real index would
+give, in exchange for a vault that is fully portable, hand-editable, and
+outlives the tool. See [`docs/decisions/`](docs/decisions/) for the reasoning,
+and [`docs/architecture.md`](docs/architecture.md) for the module map.
 
 ## Development
 
 ```bash
-uv run pytest
+uv sync
+uv run ruff format .
 uv run ruff check .
-uv run ruff format --check .
 uv run mypy src
 ```
 
-This repository is built with Claude Code. [CLAUDE.md](CLAUDE.md) holds the condensed invariants and loads into every session; [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) is the authoritative spec — architecture, memory model, milestones, and the contributor contract. Read the guide before changing anything.
+Contributor guidance lives in [CLAUDE.md](CLAUDE.md).
 
 ## Status
 
-Pre-Milestone 0. The guide is written; the code is not.
+Working and in daily use. Automated tests are not yet in place — the near-term
+roadmap is a test suite, then richer linking between notes.
+
+## License
+
+MIT © Chang Liu

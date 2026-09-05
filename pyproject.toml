@@ -1,29 +1,55 @@
 [project]
-name = "recall"
+name = "recall-mcp"
 version = "0.1.0"
-description = "Long-term engineering memory for AI coding assistants"
+description = "Durable engineering memory for AI coding assistants — captures conversations into a structured Obsidian vault"
+readme = "README.md"
 requires-python = ">=3.12"
-dependencies = [
-    "mcp",
-    "pydantic>=2",
-    "pydantic-settings>=2",
+license = { text = "MIT" }
+authors = [{ name = "Chang Liu" }]
+keywords = ["mcp", "obsidian", "knowledge-management", "ai", "notes"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Text Processing :: Markup :: Markdown",
 ]
+dependencies = [
+    "mcp>=1.2",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.2",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+recall = "recall.server:main"
+
+[project.urls]
+Homepage = "https://github.com/jerrl10/recall"
+Issues = "https://github.com/jerrl10/recall/issues"
 
 [dependency-groups]
-dev = [
-    "pytest",
-    "pytest-asyncio",
-    "ruff",
-    "mypy",
-]
+dev = ["ruff>=0.6", "mypy>=1.11", "types-PyYAML>=6.0"]
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/recall"]
 
 [tool.ruff]
 line-length = 100
 target-version = "py312"
 
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = ["mcp.*"]
+ignore_missing_imports = true

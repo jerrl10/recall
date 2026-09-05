@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "recall": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/Users/changliu/Projects/recall",
+        "run",
+        "recall"
+      ]
+    }
+  }
+}
