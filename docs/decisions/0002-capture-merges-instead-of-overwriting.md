@@ -30,10 +30,16 @@ near-duplicates that nobody trusts and search cannot rank.
 The daily log records a note once per day regardless of how many times it was
 touched.
 
-Deduplication depends on the client searching before it writes. The skill and
-every command instruct it to call `note_search` first and reuse an existing
-title. This is a workflow guarantee, not one the server can enforce — the server
-cannot tell whether two differently-titled notes are about the same thing.
+Exact-title merge is backed by a near-duplicate guard. A capture whose title is
+near-identical to an existing one — differing only by case, plurals, word order,
+punctuation, or accents — is refused, and the matches are returned so the client
+can reuse that title instead. `allow_similar=true` overrides it when the subject
+really is different.
+
+That covers wording variants. It cannot cover synonyms: the server has no way to
+know "Retry policy" and "Backoff strategy" describe one subject. For those,
+deduplication still depends on the client calling `note_search` before it
+writes, which the skill and every command instruct it to do.
 
 ## Consequences
 
@@ -47,7 +53,7 @@ Negative:
 
 - a long-lived note grows a tail of dated update sections and eventually wants
   manual consolidation
-- merging is title-exact; a near-miss title still creates a second note
+- the guard costs a round trip when it fires, and cannot catch synonyms
 
 ## Revisit when
 

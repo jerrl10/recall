@@ -14,7 +14,7 @@ from typing import Annotated, Any
 from mcp.server.mcpserver import MCPServer
 from pydantic import Field, ValidationError
 
-from . import __version__, templates
+from . import __version__, similarity, templates
 from .config import Settings, load_settings
 from .models import Note, NoteKind
 from .search import Search
@@ -83,6 +83,11 @@ calling this with the same title folds the new material into it under a dated
 update heading rather than creating a duplicate. Nothing already in the file
 is removed.
 
+If a near-identical title already exists, the write is refused and the matches
+are returned, so a subject does not end up split across two notes. Reuse the
+existing title to extend it, or pass allow_similar=true if it truly is a
+different subject.
+
 Note structure by kind — fill these in as `##` headings in the body:
 
 {templates.structure_hint()}
@@ -106,6 +111,10 @@ def note_capture(
     log_to_daily: Annotated[
         bool, Field(description="Also link this from today's daily note.")
     ] = True,
+    allow_similar: Annotated[
+        bool,
+        Field(description="Write even when a near-identical title already exists."),
+    ] = False,
 ) -> dict[str, Any]:
     """Write one durable note into the Obsidian vault.
 
@@ -126,6 +135,28 @@ def note_capture(
         )
     except ValidationError as exc:
         return _invalid(exc)
+
+    if not allow_similar and not vault.exists(note.kind, note.title):
+        near = similarity.find_similar(note.title, vault.titles())
+        if near:
+            return {
+                "ok": False,
+                "error": "a note with a near-identical title already exists",
+                "similar": [
+                    {
+                        "title": match,
+                        "wiki_link": f"[[{match}]]",
+                        "similarity": round(value, 2),
+                    }
+                    for match, value in near
+                ],
+                "hint": (
+                    "Call note_read on the closest match. To add to it, capture "
+                    "again using that exact title — the note is extended, not "
+                    "replaced. If this really is a different subject, retry with "
+                    "allow_similar=true."
+                ),
+            }
 
     try:
         result = vault.write_note(note)

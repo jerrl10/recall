@@ -52,6 +52,45 @@ class TestCapture:
         again = await call("note_capture", title="Queues", kind="concept", summary="Two.")
         assert again["action"] == "updated"
 
+    async def test_a_near_identical_title_is_refused_with_the_match(self, call: Any) -> None:
+        """The dedup guarantee: a subject must not split across two notes."""
+        await call("note_capture", title="Queue timeout", kind="concept", summary="One.")
+        result = await call("note_capture", title="Queue timeouts", kind="concept", summary="Two.")
+
+        assert result["ok"] is False
+        assert result["similar"][0]["title"] == "Queue timeout"
+        assert result["similar"][0]["wiki_link"] == "[[Queue timeout]]"
+        assert "allow_similar" in result["hint"]
+
+    async def test_the_refused_note_was_not_written(self, call: Any) -> None:
+        await call("note_capture", title="Queue timeout", kind="concept", summary="One.")
+        await call("note_capture", title="Queue timeouts", kind="concept", summary="Two.")
+        assert (await call("vault_health"))["note_counts"]["concept"] == 1
+
+    async def test_allow_similar_overrides_the_guard(self, call: Any) -> None:
+        await call("note_capture", title="Queue timeout", kind="concept", summary="One.")
+        result = await call(
+            "note_capture",
+            title="Queue timeouts",
+            kind="concept",
+            summary="Two.",
+            allow_similar=True,
+        )
+        assert result["ok"] is True
+        assert result["action"] == "created"
+
+    async def test_an_exact_title_still_merges_rather_than_being_refused(self, call: Any) -> None:
+        """The guard must not block the normal extend-an-existing-note path."""
+        await call("note_capture", title="Queue timeout", kind="concept", summary="One.")
+        result = await call("note_capture", title="Queue timeout", kind="concept", summary="Two.")
+        assert result["ok"] is True
+        assert result["action"] == "updated"
+
+    async def test_an_unrelated_title_is_not_blocked(self, call: Any) -> None:
+        await call("note_capture", title="Queue timeout", kind="concept", summary="One.")
+        result = await call("note_capture", title="Circuit breaker", kind="concept", summary="Two.")
+        assert result["ok"] is True
+
     async def test_the_daily_log_can_be_skipped(self, call: Any) -> None:
         result = await call(
             "note_capture", title="Quiet", kind="concept", summary="s", log_to_daily=False

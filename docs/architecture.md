@@ -32,6 +32,7 @@ No database. No index. No cache. The vault is the state.
 | `markdown.py` | Obsidian-flavoured Markdown: frontmatter, callouts, links, excerpts |
 | `templates.py` | The `##` section structure each kind of note uses |
 | `slug.py` | Title → filename, safe across filesystems and wiki-link syntax |
+| `similarity.py` | Near-duplicate title detection for the capture guard |
 | `vault.py` | All disk access: read, render, merge, atomic write, daily log |
 | `search.py` | Lexical ranking over the vault |
 | `server.py` | MCP tools; thin — no Markdown, no ranking, no filesystem logic |
@@ -51,9 +52,12 @@ enough that this is fast, and it means there is nothing to rebuild or
 invalidate. If it ever stops being fast, that is the signal to add a cache —
 not a reason to have started with one.
 
-**Capture merges.** Writing a note whose title already exists appends the new
-material under a dated `## Update` heading and unions the tags. Nothing on disk
-is destroyed, because some of it is the user's own writing.
+**Capture merges, and refuses near-duplicates.** Writing a note whose title
+already exists appends the new material under a dated `## Update` heading and
+unions the tags — nothing on disk is destroyed, because some of it is the user's
+own writing. A title that is near-identical to an existing one (case, plurals,
+word order, accents) is refused with the matches attached, so a subject does not
+split across two files.
 See [ADR-0002](decisions/0002-capture-merges-instead-of-overwriting.md).
 
 **Removal is withdrawal, not deletion.** `note_archive` moves a note into

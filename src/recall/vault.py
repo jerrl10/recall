@@ -96,6 +96,17 @@ class Vault:
                 return path, path.read_text(encoding="utf-8")
         return None
 
+    def exists(self, note_kind: NoteKind, title: str) -> bool:
+        """Whether this exact note already exists (an exact-title merge)."""
+        return self.path_for(note_kind, title).exists()
+
+    def titles(self) -> list[str]:
+        """Every live note title, for near-duplicate detection."""
+        return [
+            str(properties.get("title") or title_from_filename(path.name))
+            for path, properties, _ in self.iter_notes()
+        ]
+
     def archive(self, title: str, note_kind: NoteKind | None = None) -> Path | None:
         """Move a note into the archive folder, preserving its kind subfolder.
 
