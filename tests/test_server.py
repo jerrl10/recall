@@ -12,6 +12,7 @@ EXPECTED_TOOLS = {
     "note_search",
     "note_read",
     "note_context",
+    "note_archive",
     "vault_health",
 }
 
@@ -161,3 +162,46 @@ class TestHealth:
         """Absolute paths leak the user's home directory to the client."""
         result = await call("vault_health")
         assert not any(isinstance(v, str) and v.startswith("/") for v in result.values())
+
+
+class TestArchive:
+    async def test_a_note_is_moved_not_deleted(self, call: Any, settings: Any) -> None:
+        await call("note_capture", title="Wrong note", kind="concept", summary="Oops.")
+        result = await call("note_archive", title="Wrong note")
+
+        assert result["ok"] is True
+        assert result["archived_to"] == "Recall/Archive/Concepts/Wrong note.md"
+        assert (settings.vault_path / result["archived_to"]).exists()
+        assert not (settings.root_path / "Concepts" / "Wrong note.md").exists()
+
+    async def test_an_archived_note_leaves_search(self, call: Any) -> None:
+        await call("note_capture", title="Queue thing", kind="concept", summary="About queues.")
+        assert (await call("note_search", query="queues"))["count"] == 1
+
+        await call("note_archive", title="Queue thing")
+        assert (await call("note_search", query="queues"))["count"] == 0
+
+    async def test_an_archived_note_leaves_context(self, call: Any) -> None:
+        await call("note_capture", title="Queue thing", kind="concept", summary="About queues.")
+        await call("note_archive", title="Queue thing")
+        assert (await call("note_context", query="queues"))["count"] == 0
+
+    async def test_archiving_twice_does_not_clobber(self, call: Any, settings: Any) -> None:
+        for _ in range(2):
+            await call("note_capture", title="Repeat", kind="concept", summary="s")
+            await call("note_archive", title="Repeat")
+
+        archived = list((settings.archive_path).rglob("*.md"))
+        assert len(archived) == 2, "the second archive must not overwrite the first"
+
+    async def test_a_missing_note_reports_cleanly(self, call: Any) -> None:
+        result = await call("note_archive", title="Never existed")
+        assert result["ok"] is False
+        assert "Never existed" in result["error"]
+
+    async def test_health_counts_archived_notes(self, call: Any) -> None:
+        await call("note_capture", title="Gone", kind="concept", summary="s")
+        await call("note_archive", title="Gone")
+        counts = (await call("vault_health"))["note_counts"]
+        assert counts["archived"] == 1
+        assert counts["concept"] == 0

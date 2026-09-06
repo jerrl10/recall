@@ -64,11 +64,14 @@ class Vault:
 
         Daily logs are skipped: they are an index of captures, not knowledge,
         and including them would make every search match today's date.
+        Archived notes are skipped because withdrawing a note is the whole
+        point of archiving it.
         """
         if not self.settings.root_path.exists():
             return
+        skip = (self.settings.daily_path, self.settings.archive_path)
         for path in sorted(self.settings.root_path.rglob("*.md")):
-            if self.settings.daily_path in path.parents:
+            if any(folder in path.parents for folder in skip):
                 continue
             try:
                 text = path.read_text(encoding="utf-8")
@@ -87,9 +90,40 @@ class Vault:
 
         target = note_filename(title).lower()
         for path in self.settings.root_path.rglob("*.md"):
+            if self.settings.archive_path in path.parents:
+                continue
             if path.name.lower() == target:
                 return path, path.read_text(encoding="utf-8")
         return None
+
+    def archive(self, title: str, note_kind: NoteKind | None = None) -> Path | None:
+        """Move a note into the archive folder, preserving its kind subfolder.
+
+        Recall writes autonomously, so it needs a way to withdraw a note it
+        should not have written. Moving rather than deleting keeps the action
+        reversible: the file stays visible in Obsidian and can be dragged back.
+        Nothing an agent does to this vault should be permanent.
+        """
+        found = self.read(title, note_kind)
+        if found is None:
+            return None
+
+        source, _ = found
+        if self.settings.archive_path in source.parents:
+            return source
+
+        destination = self._guard(self.settings.archive_path / source.parent.name / source.name)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+
+        # Never clobber something already archived under the same name.
+        if destination.exists():
+            stamp = date.today().isoformat()
+            destination = self._guard(
+                destination.with_name(f"{destination.stem} ({stamp}){destination.suffix}")
+            )
+
+        os.replace(source, destination)
+        return destination
 
     def body_of(self, path: Path) -> str:
         """Read one note's Markdown body, without its frontmatter.
@@ -246,6 +280,8 @@ class Vault:
             counts[kind.value] = len(list(folder.glob("*.md"))) if folder.exists() else 0
         daily = self.settings.daily_path
         counts["daily"] = len(list(daily.glob("*.md"))) if daily.exists() else 0
+        archive = self.settings.archive_path
+        counts["archived"] = len(list(archive.rglob("*.md"))) if archive.exists() else 0
         return counts
 
 

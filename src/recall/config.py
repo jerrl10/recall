@@ -32,6 +32,10 @@ class Settings(BaseSettings):
         default="Daily",
         description="Subfolder holding dated capture logs.",
     )
+    archive_folder: str = Field(
+        default="Archive",
+        description="Subfolder holding notes withdrawn from search.",
+    )
     max_search_results: int = Field(default=10, ge=1, le=100)
     excerpt_chars: int = Field(default=320, ge=80, le=2000)
     context_char_budget: int = Field(
@@ -46,7 +50,7 @@ class Settings(BaseSettings):
     def _expand(cls, value: Path) -> Path:
         return value.expanduser().resolve()
 
-    @field_validator("root", "daily_folder")
+    @field_validator("root", "daily_folder", "archive_folder")
     @classmethod
     def _clean_folder(cls, value: str) -> str:
         cleaned = value.strip().strip("/")
@@ -63,6 +67,11 @@ class Settings(BaseSettings):
     def daily_path(self) -> Path:
         """Absolute path to the daily-log folder."""
         return self.root_path / self.daily_folder
+
+    @property
+    def archive_path(self) -> Path:
+        """Absolute path to the archive folder."""
+        return self.root_path / self.archive_folder
 
     def validate_vault(self) -> None:
         """Fail fast on a misconfigured vault.

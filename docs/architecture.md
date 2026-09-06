@@ -56,6 +56,11 @@ material under a dated `## Update` heading and unions the tags. Nothing on disk
 is destroyed, because some of it is the user's own writing.
 See [ADR-0002](decisions/0002-capture-merges-instead-of-overwriting.md).
 
+**Removal is withdrawal, not deletion.** `note_archive` moves a note into
+`Recall/Archive/`, where it drops out of search and context but stays visible in
+Obsidian and can be dragged back. Recall writes autonomously, so it needs a way
+to undo itself — but nothing an agent does to the vault should be permanent.
+
 **Writes are atomic and confined.** Every write goes to a temporary file in the
 same directory and is renamed into place, so Obsidian's file watcher and any
 sync client never see a partial note. Every path is resolved before use and

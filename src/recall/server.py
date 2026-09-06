@@ -200,6 +200,38 @@ def note_read(
 
 
 @mcp.tool()
+def note_archive(
+    title: Annotated[str, Field(description="Exact title of the note to withdraw.")],
+    kind: Annotated[NoteKind | None, Field(description="Narrows the lookup if known.")] = None,
+) -> dict[str, Any]:
+    """Withdraw a note that should not have been captured.
+
+    The file is moved into the archive folder, not deleted: it disappears from
+    search and context but stays in the vault, so the user can restore it by
+    dragging it back in Obsidian. Use this for a note captured in error or
+    superseded wholesale — to correct a note, capture it again under the same
+    title instead, which extends it rather than replacing it.
+    """
+    settings, vault, _ = _context()
+    try:
+        destination = vault.archive(title, kind)
+    except VaultError as exc:
+        return {"ok": False, "error": str(exc)}
+    except OSError as exc:
+        return {"ok": False, "error": f"could not archive note: {exc.strerror or exc}"}
+
+    if destination is None:
+        return {"ok": False, "error": f"no note titled {title!r}"}
+
+    return {
+        "ok": True,
+        "title": title,
+        "archived_to": str(destination.relative_to(settings.vault_path)),
+        "note": "moved, not deleted — restore it by moving the file back in Obsidian",
+    }
+
+
+@mcp.tool()
 def note_context(
     query: Annotated[str, Field(description="What you are about to work on.")],
     limit: Annotated[int, Field(description="Maximum notes to include.", ge=1, le=20)] = 5,

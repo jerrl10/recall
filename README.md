@@ -159,7 +159,8 @@ YourVault/
     ├── Lessons/      what broke, why, and the fix
     ├── Questions/    open threads worth returning to
     ├── Projects/     durable per-project context
-    └── Daily/        dated log linking each day's captures
+    ├── Daily/        dated log linking each day's captures
+    └── Archive/      withdrawn notes, kept out of search
 ```
 
 Topic notes hold the knowledge; the daily log gives you the timeline. Recall
@@ -174,6 +175,7 @@ Set via environment or a `.env` file — see [`.env.example`](.env.example).
 | `RECALL_VAULT_PATH` | *required* | Path to your Obsidian vault |
 | `RECALL_ROOT` | `Recall` | Folder inside the vault that Recall owns |
 | `RECALL_DAILY_FOLDER` | `Daily` | Subfolder for dated logs |
+| `RECALL_ARCHIVE_FOLDER` | `Archive` | Subfolder for withdrawn notes |
 | `RECALL_MAX_SEARCH_RESULTS` | `10` | Default result cap |
 | `RECALL_EXCERPT_CHARS` | `320` | Search excerpt length |
 | `RECALL_CONTEXT_CHAR_BUDGET` | `8000` | Hard cap on text `note_context` returns |
@@ -189,6 +191,7 @@ vault, and never writes outside `RECALL_ROOT`.
 | `note_search` | Ranked search across the vault, with excerpts |
 | `note_read` | Read one note in full |
 | `note_context` | Assemble relevant prior knowledge for the current task |
+| `note_archive` | Withdraw a note captured in error — moved, never deleted |
 | `vault_health` | Verify configuration, reachability, and note counts |
 
 ## How it works
