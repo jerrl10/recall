@@ -37,6 +37,18 @@ def note_filename(title: str) -> str:
     return f"{_safe_stem(title)}.md"
 
 
+def display_title(title: str) -> str:
+    """The title as it should be recorded in frontmatter and links.
+
+    This is the sanitised stem, not the raw input. Storing the raw string
+    would let the ``title`` property disagree with both the filename and the
+    ``[[wiki link]]`` that resolves to it — a title of ``../../escape`` is
+    written to ``escape.md`` and linked as ``[[escape]]``, so recording the
+    original would leave three different names for one note.
+    """
+    return _safe_stem(title)
+
+
 def _safe_stem(title: str) -> str:
     # Normalize so visually identical titles produce one filename.
     stem = unicodedata.normalize("NFC", title)

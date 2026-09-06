@@ -17,7 +17,7 @@ from typing import Any
 from . import markdown, templates
 from .config import Settings
 from .models import CaptureResult, Note, NoteKind
-from .slug import note_filename, title_from_filename
+from .slug import display_title, note_filename, title_from_filename
 
 
 class VaultError(RuntimeError):
@@ -130,7 +130,7 @@ class Vault:
 
         self._atomic_write(path, text)
         return CaptureResult(
-            title=note.title,
+            title=display_title(note.title),
             kind=note.kind,
             path=path,
             created=created,
@@ -138,8 +138,9 @@ class Vault:
         )
 
     def _render(self, note: Note, *, created_on: date, updated_on: date) -> str:
+        title = display_title(note.title)
         properties: dict[str, Any] = {
-            "title": note.title,
+            "title": title,
             "kind": note.kind.value,
             "created": note.created or created_on,
             "updated": note.updated or updated_on,
@@ -149,7 +150,7 @@ class Vault:
         }
 
         blocks = [
-            f"# {note.title}",
+            f"# {title}",
             markdown.callout(note.summary),
             note.body.strip() or templates.skeleton(note.kind),
         ]
@@ -164,7 +165,7 @@ class Vault:
         properties, body = markdown.split_frontmatter(existing)
 
         properties["updated"] = today
-        properties.setdefault("title", note.title)
+        properties.setdefault("title", display_title(note.title))
         properties.setdefault("kind", note.kind.value)
         properties["tags"] = _union(properties.get("tags"), note.tags)
         properties["projects"] = _union(properties.get("projects"), note.projects)
