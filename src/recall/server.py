@@ -73,7 +73,23 @@ def _invalid(exc: ValidationError) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool()
+#: Built before registration: the decorator captures the description at
+#: decoration time, so formatting the docstring afterwards would leave the
+#: placeholder in the schema the model actually sees.
+_CAPTURE_DESCRIPTION = f"""Write one durable note into the Obsidian vault.
+
+Search first with `note_search`: if a note on this subject already exists,
+calling this with the same title folds the new material into it under a dated
+update heading rather than creating a duplicate. Nothing already in the file
+is removed.
+
+Note structure by kind — fill these in as `##` headings in the body:
+
+{templates.structure_hint()}
+"""
+
+
+@mcp.tool(description=_CAPTURE_DESCRIPTION)
 def note_capture(
     title: Annotated[str, Field(description="Short, specific, reusable as a wiki-link target.")],
     kind: Annotated[
@@ -93,14 +109,8 @@ def note_capture(
 ) -> dict[str, Any]:
     """Write one durable note into the Obsidian vault.
 
-    Search first with `note_search`: if a note on this subject already exists,
-    calling this with the same title folds the new material into it under a
-    dated update heading rather than creating a duplicate. Nothing already in
-    the file is removed.
-
-    Note structure by kind:
-
-    {structure}
+    The description registered with MCP is ``_CAPTURE_DESCRIPTION`` above,
+    which carries the per-kind section structure.
     """
     settings, vault, _ = _context()
     try:
@@ -134,9 +144,6 @@ def note_capture(
         "relative_path": str(result.path.relative_to(settings.vault_path)),
         "daily_note": str(daily_path.relative_to(settings.vault_path)) if daily_path else None,
     }
-
-
-note_capture.__doc__ = (note_capture.__doc__ or "").format(structure=templates.structure_hint())
 
 
 @mcp.tool()
