@@ -89,6 +89,19 @@ Slow consumers cause duplicate processing.
 
 Obsidian-native throughout: frontmatter properties, callouts, wiki links, tags.
 
+### See it for yourself
+
+Seed a throwaway vault with a set of interlinked notes and open it in Obsidian:
+
+```bash
+python scripts/demo_vault.py /tmp/recall-demo
+```
+
+Seven notes across all five kinds, written through the normal capture path —
+so what you see is what a real session produces. Open `/tmp/recall-demo` in
+Obsidian as a vault and look at the graph view: the notes reference each other,
+which is what turns a folder of files into something you can navigate.
+
 ---
 
 ## Install
