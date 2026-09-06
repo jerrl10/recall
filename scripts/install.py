@@ -18,6 +18,7 @@ import argparse
 import json
 import shutil
 import sys
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -36,13 +37,23 @@ PROVIDERS = ("claude", "codex", "opencode")
 
 @dataclass
 class Action:
-    """One filesystem change, described before it happens."""
+    """One filesystem change, described before it happens.
+
+    ``content`` of ``None`` means "nothing to do" — the action still prints so
+    the user learns why a file was left alone.
+    """
 
     path: Path
-    content: str
+    content: str | None
     note: str = ""
 
+    @property
+    def writes(self) -> bool:
+        return self.content is not None
+
     def apply(self) -> None:
+        if self.content is None:
+            return
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(self.content, encoding="utf-8")
 
@@ -141,13 +152,10 @@ def plan_codex(vault: str | None, scope: Path, use_uv: bool) -> list[Action]:
     ]
     if vault:
         lines += ["", "[mcp_servers.recall.env]", f'RECALL_VAULT_PATH = "{vault}"']
+    block = "\n".join(lines) + "\n"
 
     actions = [
-        Action(
-            scope / ".codex" / "config.toml",
-            "\n".join(lines) + "\n",
-            "MCP server registration (merge by hand if the file exists)",
-        ),
+        _codex_config_action(scope / ".codex" / "config.toml", block),
         Action(scope / "AGENTS.md", _agents_md(), "skill as agent instructions"),
     ]
     prompts = Path.home() / ".codex" / "prompts"
@@ -168,6 +176,37 @@ PLANNERS = {"claude": plan_claude, "codex": plan_codex, "opencode": plan_opencod
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _codex_config_action(path: Path, block: str) -> Action:
+    """Add Recall to a Codex config without disturbing what is already there.
+
+    Codex configs commonly hold several MCP servers. There is no TOML writer in
+    the standard library, so rather than re-serialise the file — which would
+    discard comments and formatting — the new table is appended. Appending a
+    top-level table is always valid TOML, and the result is parsed to confirm
+    it before anything is written.
+    """
+    if not path.exists():
+        return Action(path, block, "MCP server registration")
+
+    existing = path.read_text(encoding="utf-8")
+    if "[mcp_servers.recall]" in existing:
+        return Action(
+            path,
+            None,
+            "already registers 'recall' — left untouched, edit by hand to change it",
+        )
+
+    merged = existing.rstrip("\n") + "\n\n" + block
+    try:
+        tomllib.loads(merged)
+    except tomllib.TOMLDecodeError as exc:
+        return Action(
+            path, None, f"could not append safely ({exc}) — add this block by hand:\n{block}"
+        )
+
+    return Action(path, merged, "MCP server registration (appended; existing servers kept)")
 
 
 def _read_json(path: Path) -> dict[str, object]:
@@ -258,7 +297,12 @@ def main() -> int:
         actions = PLANNERS[provider](vault, scope, use_uv)
         print(f"\n{provider}:")
         for action in actions:
-            marker = "would write" if args.dry_run else "wrote"
+            if not action.writes:
+                marker = "skipped "
+            elif args.dry_run:
+                marker = "would write"
+            else:
+                marker = "wrote"
             try:
                 shown: Path | str = action.path.relative_to(scope)
             except ValueError:
