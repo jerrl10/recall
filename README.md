@@ -1,5 +1,9 @@
 # Recall
 
+[![CI](https://github.com/jerrl10/recall/actions/workflows/ci.yml/badge.svg)](https://github.com/jerrl10/recall/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+
 **Durable engineering memory for AI coding assistants.**
 
 You solve a hard problem with an AI assistant on Tuesday. On Friday the context
@@ -21,8 +25,9 @@ you: "this visibility timeout thing is important — save it"
   next session: /recall  ──▶  the knowledge is back in context
 ```
 
-Works with **Claude Code**, **Codex**, and **OpenCode** from one shared
-configuration.
+Built for **Claude Code**, **Codex**, and **OpenCode** from one shared
+configuration. *(Verified end-to-end on Claude Code; see
+[provider support](#provider-support).)*
 
 ---
 
@@ -112,10 +117,25 @@ python scripts/install.py all --vault ~/Documents/Obsidian/MyVault
 ```
 
 Add `--dry-run` to see exactly what would be written first. Existing MCP
-configuration is merged, not overwritten.
+configuration is merged, never overwritten — a config that already registers
+`recall` is left untouched.
 
 Restart your assistant, then confirm the connection by asking it to run
 `vault_health`.
+
+### Provider support
+
+One canonical skill and command set in `ai/` is rendered into each assistant's
+native layout, so the workflows cannot drift apart.
+
+| Provider | Status | MCP config | Commands |
+| --- | --- | --- | --- |
+| Claude Code | Verified end-to-end, in daily use | `.mcp.json` | `.claude/commands/` |
+| Codex | Config generated and installer tested; not yet exercised against a live session | `.codex/config.toml` | `~/.codex/prompts/` *(global only)* |
+| OpenCode | Config generated and installer tested; not yet exercised against a live session | `opencode.json` | `.opencode/commands/` |
+
+Config formats follow each vendor's current documentation, and the installer is
+covered by CI. If you run Recall on Codex or OpenCode, reports are welcome.
 
 ## Use
 
@@ -156,6 +176,7 @@ Set via environment or a `.env` file — see [`.env.example`](.env.example).
 | `RECALL_DAILY_FOLDER` | `Daily` | Subfolder for dated logs |
 | `RECALL_MAX_SEARCH_RESULTS` | `10` | Default result cap |
 | `RECALL_EXCERPT_CHARS` | `320` | Search excerpt length |
+| `RECALL_CONTEXT_CHAR_BUDGET` | `8000` | Hard cap on text `note_context` returns |
 
 Recall creates its own folder inside an existing vault. It never creates a
 vault, and never writes outside `RECALL_ROOT`.
@@ -194,8 +215,10 @@ Contributor guidance lives in [CLAUDE.md](CLAUDE.md).
 
 ## Status
 
-Working and in daily use. Automated tests are not yet in place — the near-term
-roadmap is a test suite, then richer linking between notes.
+Working and in daily use on Claude Code. CI covers formatting, types, and
+smoke checks over capture, merge, search, context, and the installer; a proper
+unit test suite is the next piece of work, followed by verifying the Codex and
+OpenCode paths against live sessions.
 
 ## License
 
