@@ -41,7 +41,9 @@ Most AI memory tools store conversation history. Recall stores *conclusions*.
 - **Structured, not dumped.** Each note is classified, templated by kind, tagged,
   cross-linked, and logged to a daily timeline.
 - **Merges instead of duplicating.** Capturing the same subject twice extends
-  the existing note rather than scattering near-duplicates across the vault.
+  the existing note. A near-identical title is refused outright; a different
+  title covering the same ground — "Backoff strategy" against "Retry policy" —
+  comes back flagged, because search reads bodies, not just headings.
 - **Provider-neutral.** One canonical skill and command set, installed into
   whichever assistants you use.
 - **No LLM inside the server.** Your assistant already has the conversation and

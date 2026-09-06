@@ -51,6 +51,24 @@ def _context() -> tuple[Settings, Vault, Search]:
     return _settings, _vault, _search
 
 
+def _related(search: Search, note: Note, limit: int = 3) -> list[dict[str, Any]]:
+    """Existing notes whose content overlaps a note about to be written.
+
+    The title guard catches re-wordings of one subject. This catches the other
+    half — two different titles for the same thing — by querying with the new
+    note's own words, since a body carries the vocabulary a short title omits.
+    It only ever advises: content overlap is common between genuinely distinct
+    notes, so refusing on it would block far more good writes than bad ones.
+    """
+    query = " ".join([note.title, note.summary, " ".join(note.tags)])
+    hits = search.query(query, limit=limit + 1)
+    return [
+        {"title": hit.title, "wiki_link": hit.wiki_link, "score": hit.score}
+        for hit in hits
+        if hit.title.casefold() != note.title.casefold()
+    ][:limit]
+
+
 def _invalid(exc: ValidationError) -> dict[str, Any]:
     """Turn a validation failure into something the caller can act on.
 
@@ -121,7 +139,7 @@ def note_capture(
     The description registered with MCP is ``_CAPTURE_DESCRIPTION`` above,
     which carries the per-kind section structure.
     """
-    settings, vault, _ = _context()
+    settings, vault, search = _context()
     try:
         note = Note(
             title=title,
@@ -158,6 +176,11 @@ def note_capture(
                 ),
             }
 
+    # Content overlap is looser evidence than a title match, so it informs
+    # rather than blocks: bodies share vocabulary that titles do not, which is
+    # what catches a synonym like "Backoff strategy" against "Retry policy".
+    related_notes = _related(search, note) if not vault.exists(note.kind, note.title) else []
+
     try:
         result = vault.write_note(note)
         daily_path = vault.log_daily([result]) if log_to_daily else None
@@ -174,6 +197,18 @@ def note_capture(
         "action": "created" if result.created else "updated",
         "relative_path": str(result.path.relative_to(settings.vault_path)),
         "daily_note": str(daily_path.relative_to(settings.vault_path)) if daily_path else None,
+        "related_notes": related_notes,
+        **(
+            {
+                "hint": (
+                    "These existing notes cover overlapping ground. If one is "
+                    "really the same subject, capture again under its title to "
+                    "merge; otherwise link them with related=[...]."
+                )
+            }
+            if related_notes
+            else {}
+        ),
     }
 
 

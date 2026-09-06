@@ -45,8 +45,10 @@ Each kind has its own sections. Fill them in the note body as `##` headings.
 ## Procedure
 
 1. **Search first.** Call `note_search` with the subject before writing
-   anything. This is not optional — it is what keeps the vault from filling
-   with near-duplicates.
+   anything. Search matches note bodies, not just titles, so a query phrased
+   differently from an existing title still finds it — "backoff strategy"
+   turns up a note called "Retry policy". Use the words you would naturally
+   use; if the subject is broad, search twice with different phrasings.
 
 2. **Extend rather than duplicate.** If a note already covers the ground,
    call `note_capture` with that note's **exact existing title**. The new
@@ -72,7 +74,14 @@ Each kind has its own sections. Fill them in the note body as `##` headings.
    - *Related* — titles of other notes. They render as `[[wiki links]]` and
      are what make the vault a graph rather than a pile.
 
-4. **Report briefly.** Say what was created or updated and stop. Do not paste
+4. **Act on `related_notes`.** A successful capture may come back with notes
+   whose content overlaps, even though the titles differ — "Backoff strategy"
+   against an existing "Retry policy". Read the closest one. If it is really
+   the same subject, capture again under *its* title so the knowledge lands in
+   one place; if the two are genuinely distinct, capture again with
+   `related=[...]` so they link in the graph rather than sitting unconnected.
+
+5. **Report briefly.** Say what was created or updated and stop. Do not paste
    note bodies back into the conversation — the user reads them in Obsidian.
 
 ## Rules

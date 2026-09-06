@@ -36,10 +36,17 @@ punctuation, or accents — is refused, and the matches are returned so the clie
 can reuse that title instead. `allow_similar=true` overrides it when the subject
 really is different.
 
-That covers wording variants. It cannot cover synonyms: the server has no way to
-know "Retry policy" and "Backoff strategy" describe one subject. For those,
-deduplication still depends on the client calling `note_search` before it
-writes, which the skill and every command instruct it to do.
+That covers wording variants. Synonyms — "Retry policy" and "Backoff strategy"
+naming one subject — are handled separately and more weakly: on a create,
+capture queries the vault with the new note's own title, summary, and tags, and
+returns any content matches as `related_notes`. Bodies carry the vocabulary
+short titles omit, so the overlap is usually visible even when the titles share
+no words.
+
+That advises rather than blocks. Content overlap is common between genuinely
+distinct notes, so refusing on it would block far more good writes than bad
+ones; the client is told what overlaps and decides whether to merge under the
+existing title or link the two.
 
 ## Consequences
 
@@ -53,7 +60,9 @@ Negative:
 
 - a long-lived note grows a tail of dated update sections and eventually wants
   manual consolidation
-- the guard costs a round trip when it fires, and cannot catch synonyms
+- the title guard costs a round trip when it fires
+- synonym detection only advises, so a determined client can still create
+  a second note on one subject
 
 ## Revisit when
 

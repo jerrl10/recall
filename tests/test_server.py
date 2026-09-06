@@ -91,6 +91,46 @@ class TestCapture:
         result = await call("note_capture", title="Circuit breaker", kind="concept", summary="Two.")
         assert result["ok"] is True
 
+    async def test_a_synonym_title_surfaces_the_overlapping_note(self, call: Any) -> None:
+        """Different title, same subject — the case a title guard cannot see."""
+        await call(
+            "note_capture",
+            title="Retry policy",
+            kind="decision",
+            summary="Retries use exponential backoff with jitter.",
+            body="## Decision\n\nExponential backoff with full jitter.",
+            tags=["retries"],
+        )
+        result = await call(
+            "note_capture",
+            title="Backoff strategy",
+            kind="decision",
+            summary="Use exponential backoff with jitter when retrying.",
+            body="## Decision\n\nBackoff exponentially between retry attempts.",
+        )
+
+        assert result["ok"] is True, "content overlap advises, it must not block"
+        assert result["related_notes"][0]["title"] == "Retry policy"
+        assert "merge" in result["hint"]
+
+    async def test_an_unrelated_note_gets_no_suggestions(self, call: Any) -> None:
+        await call("note_capture", title="Retry policy", kind="decision", summary="Backoff.")
+        result = await call(
+            "note_capture",
+            title="Postgres vacuum",
+            kind="concept",
+            summary="Reclaims dead tuples.",
+            body="## How it works\n\nAutovacuum runs periodically.",
+        )
+        assert result["related_notes"] == []
+        assert "hint" not in result
+
+    async def test_a_note_never_suggests_itself(self, call: Any) -> None:
+        await call("note_capture", title="Queues", kind="concept", summary="About queues.")
+        result = await call("note_capture", title="Queues", kind="concept", summary="More.")
+        titles = [item["title"] for item in result["related_notes"]]
+        assert "Queues" not in titles
+
     async def test_the_daily_log_can_be_skipped(self, call: Any) -> None:
         result = await call(
             "note_capture", title="Quiet", kind="concept", summary="s", log_to_daily=False
