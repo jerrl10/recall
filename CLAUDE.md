@@ -12,11 +12,12 @@ two load-bearing choices: [docs/decisions/](docs/decisions/).
 uv sync
 uv run ruff format .
 uv run ruff check .
-uv run mypy src          # strict
+uv run mypy src tests    # strict
+uv run pytest
 ```
 
 Run all of these after any change, plus `uv run pytest` — 115 tests, all
-against temporary vaults. CI runs the same four. To poke at behaviour by hand,
+against temporary vaults. CI runs the same set. To poke at behaviour by hand,
 drive the tools against a scratch vault:
 
 ```bash
@@ -56,10 +57,9 @@ Dependencies point one way: `server → {vault, search} → {markdown, templates
    Obsidian watches the vault; a partial file is visible to it.
 4. **Every path passes `Vault._guard`** before use, resolved first so `..` and
    symlinks cannot escape `RECALL_ROOT`.
-4b. **Nothing is ever deleted.** `note_archive` moves a file; capture merges.
-   An agent must not be able to destroy the user's writing.
-5. **Never destroy note content.** Capture merges (ADR-0002). Some of what is on
-   disk was written by the user.
+5. **Nothing is ever destroyed.** Capture merges (ADR-0002); `note_archive`
+   moves rather than deletes. Some of what is on disk was written by the user,
+   and an agent must not be able to destroy it.
 6. **No LLM, no network, no API key** in the server. The client reasons; Recall
    stores and retrieves.
 7. **`server.py` stays thin** — validate, delegate, return. No Markdown
