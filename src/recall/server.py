@@ -7,14 +7,17 @@ and ranking lives in the modules it delegates to.
 
 from __future__ import annotations
 
+import functools
+import logging
 import sys
+from collections.abc import Callable
 from datetime import date
 from typing import Annotated, Any
 
 from mcp.server.mcpserver import MCPServer
 from pydantic import Field, ValidationError
 
-from . import __version__, similarity, templates
+from . import __version__, log, similarity, templates
 from .config import Settings, load_settings
 from .models import Note, NoteKind
 from .search import Search
@@ -69,6 +72,26 @@ def _related(search: Search, note: Note, limit: int = 3) -> list[dict[str, Any]]
     ][:limit]
 
 
+def observed[**P](fn: Callable[P, dict[str, Any]]) -> Callable[P, dict[str, Any]]:
+    """Log one line per tool call: name, outcome, and duration.
+
+    Applied beneath ``@mcp.tool()``; ``functools.wraps`` keeps the signature
+    and annotations the schema is generated from. Arguments are deliberately
+    not logged — they carry note content.
+    """
+
+    @functools.wraps(fn)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> dict[str, Any]:
+        with log.operation(fn.__name__) as record:
+            result = fn(*args, **kwargs)
+            record["outcome"] = "ok" if result.get("ok") else "refused"
+            if not result.get("ok"):
+                record["reason"] = str(result.get("error", ""))[:120]
+            return result
+
+    return wrapper
+
+
 def _invalid(exc: ValidationError) -> dict[str, Any]:
     """Turn a validation failure into something the caller can act on.
 
@@ -113,6 +136,7 @@ Note structure by kind — fill these in as `##` headings in the body:
 
 
 @mcp.tool(description=_CAPTURE_DESCRIPTION)
+@observed
 def note_capture(
     title: Annotated[str, Field(description="Short, specific, reusable as a wiki-link target.")],
     kind: Annotated[
@@ -213,6 +237,7 @@ def note_capture(
 
 
 @mcp.tool()
+@observed
 def note_search(
     query: Annotated[str, Field(description="Natural-language description of the subject.")],
     limit: Annotated[int, Field(description="Maximum results.", ge=1, le=50)] = 8,
@@ -247,6 +272,7 @@ def note_search(
 
 
 @mcp.tool()
+@observed
 def note_read(
     title: Annotated[str, Field(description="Exact note title.")],
     kind: Annotated[NoteKind | None, Field(description="Narrows the lookup if known.")] = None,
@@ -266,6 +292,7 @@ def note_read(
 
 
 @mcp.tool()
+@observed
 def note_archive(
     title: Annotated[str, Field(description="Exact title of the note to withdraw.")],
     kind: Annotated[NoteKind | None, Field(description="Narrows the lookup if known.")] = None,
@@ -298,6 +325,7 @@ def note_archive(
 
 
 @mcp.tool()
+@observed
 def note_context(
     query: Annotated[str, Field(description="What you are about to work on.")],
     limit: Annotated[int, Field(description="Maximum notes to include.", ge=1, le=20)] = 5,
@@ -346,6 +374,7 @@ def note_context(
 
 
 @mcp.tool()
+@observed
 def vault_health() -> dict[str, Any]:
     """Report whether the vault is configured and reachable.
 
@@ -390,11 +419,22 @@ def main() -> None:
     Diagnostics go to stderr.
     """
     try:
-        load_settings()
+        settings = load_settings()
     except Exception as exc:
+        # Logging is not configured yet, so write the one line by hand —
+        # to stderr, never stdout.
         print(f"recall: configuration error: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
 
+    log.configure(settings.log_level)
+    log.event(
+        logging.INFO,
+        "starting",
+        version=__version__,
+        root=settings.root,
+        # The vault path is not logged: it is a local filesystem path and
+        # logs are the easiest place for one to leak from.
+    )
     mcp.run()
 
 

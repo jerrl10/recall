@@ -36,6 +36,10 @@ class Settings(BaseSettings):
         default="Archive",
         description="Subfolder holding notes withdrawn from search.",
     )
+    log_level: str = Field(
+        default="INFO",
+        description="DEBUG, INFO, WARNING, ERROR, or CRITICAL.",
+    )
     max_search_results: int = Field(default=10, ge=1, le=100)
     excerpt_chars: int = Field(default=320, ge=80, le=2000)
     context_char_budget: int = Field(
