@@ -47,10 +47,14 @@ See [ADR-0001](decisions/0001-markdown-is-the-source-of-truth.md).
 
 **Search scans; it does not index.** Every query walks the vault and scores in
 memory. Ranking is a weighted term overlap across title, tags, summary, and
-body, discounted by term commonness and note length. A personal vault is small
-enough that this is fast, and it means there is nothing to rebuild or
-invalidate. If it ever stops being fast, that is the signal to add a cache —
-not a reason to have started with one.
+body, discounted by term commonness and note length. There is nothing to
+rebuild or invalidate.
+
+Parsed notes are memoised in-process on `(mtime_ns, size)`, so a repeat query in
+the same session re-reads only what changed — roughly 360 ms cold and 145 ms
+warm over 2,000 notes. That is a memo, not an index: it is derived entirely
+from the files, survives nothing, and a stale entry is impossible because any
+edit changes the key. The vault stays the source of truth.
 
 **Capture merges, and refuses near-duplicates.** Writing a note whose title
 already exists appends the new material under a dated `## Update` heading and

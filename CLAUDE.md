@@ -15,9 +15,9 @@ uv run ruff check .
 uv run mypy src          # strict
 ```
 
-Run all of these after any change. There is no test suite yet — deliberately,
-while features are still moving — so lint and types are the only automated
-signal. Verify behaviour by driving the tools against a scratch vault:
+Run all of these after any change, plus `uv run pytest` — 115 tests, all
+against temporary vaults. CI runs the same four. To poke at behaviour by hand,
+drive the tools against a scratch vault:
 
 ```bash
 RECALL_VAULT_PATH=/tmp/scratch-vault uv run python -c "
@@ -37,7 +37,8 @@ src/recall/
   markdown.py   frontmatter, callouts, wiki links, excerpts
   templates.py  per-kind section structure
   slug.py       title → safe filename
-  vault.py      ALL disk access
+  similarity.py near-duplicate title detection
+  vault.py      ALL disk access + the (mtime, size) parse memo
   search.py     scan + rank
   server.py     MCP tools — thin
 
@@ -55,6 +56,8 @@ Dependencies point one way: `server → {vault, search} → {markdown, templates
    Obsidian watches the vault; a partial file is visible to it.
 4. **Every path passes `Vault._guard`** before use, resolved first so `..` and
    symlinks cannot escape `RECALL_ROOT`.
+4b. **Nothing is ever deleted.** `note_archive` moves a file; capture merges.
+   An agent must not be able to destroy the user's writing.
 5. **Never destroy note content.** Capture merges (ADR-0002). Some of what is on
    disk was written by the user.
 6. **No LLM, no network, no API key** in the server. The client reasons; Recall
@@ -67,7 +70,12 @@ Dependencies point one way: `server → {vault, search} → {markdown, templates
 ## Traps
 
 - **Adding a database.** ADR-0001 rules it out and explains why. If search gets
-  slow, add a *derived, rebuildable* index — the vault stays authoritative.
+  slow, add a *derived, rebuildable* index — the vault stays authoritative. The
+  `(mtime, size)` memo in `Vault._parse` is the current answer; extend that
+  before reaching for storage.
+- **Bypassing `iter_notes`.** It skips daily logs and archived notes and feeds
+  the parse memo. Walking the vault directly re-reads everything and resurrects
+  archived notes into search.
 - **Editing provider configs directly.** `.claude/`, `opencode.json`, and
   `.codex/` are generated. Edit `ai/`, then re-run `scripts/install.py`.
 - **`mcp` is 2.x.** `FastMCP` was renamed `MCPServer`

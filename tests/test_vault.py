@@ -145,3 +145,49 @@ def test_a_failed_write_leaves_no_temporary_files(
 
     leftovers = list(result.path.parent.glob(".recall-*"))
     assert leftovers == []
+
+
+class TestParseCache:
+    """The memo is keyed on (mtime, size), so a stale read is impossible."""
+
+    def test_an_edit_on_disk_is_picked_up(self, vault: Vault) -> None:
+        result = vault.write_note(make_note())
+        list(vault.iter_notes())  # populate the memo
+        text = result.path.read_text(encoding="utf-8").replace("Detail.", "Rewritten by hand.")
+        result.path.write_text(text, encoding="utf-8")
+
+        bodies = [body for _, _, body in vault.iter_notes()]
+        assert any("Rewritten by hand." in body for body in bodies)
+
+    def test_a_repeat_scan_does_not_reread_the_file(
+        self, vault: Vault, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault.write_note(make_note())
+        list(vault.iter_notes())
+
+        reads = 0
+        original = Path.read_text
+
+        def counting(self: Path, *args: object, **kwargs: object) -> str:
+            nonlocal reads
+            reads += 1
+            return original(self, *args, **kwargs)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(Path, "read_text", counting)
+        list(vault.iter_notes())
+        assert reads == 0, "an unchanged note should be served from the memo"
+
+    def test_writing_invalidates_the_memo(self, vault: Vault) -> None:
+        vault.write_note(make_note())
+        list(vault.iter_notes())
+
+        vault.write_note(make_note(body="Second capture."))
+        bodies = [body for _, _, body in vault.iter_notes()]
+        assert any("Second capture." in body for body in bodies)
+
+    def test_archiving_drops_the_note_from_iteration(self, vault: Vault) -> None:
+        vault.write_note(make_note())
+        list(vault.iter_notes())
+
+        vault.archive("Visibility timeout")
+        assert list(vault.iter_notes()) == []

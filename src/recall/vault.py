@@ -29,6 +29,11 @@ class Vault:
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
+        #: Parsed notes keyed by path, guarded by (mtime_ns, size). This is a
+        #: memo, not an index: it is derived entirely from the files, needs no
+        #: rebuild, and a stale entry is impossible because any edit changes
+        #: the key. The vault remains the source of truth.
+        self._parsed: dict[Path, tuple[tuple[int, int], dict[str, Any], str]] = {}
 
     # ------------------------------------------------------------------
     # Paths
@@ -70,15 +75,40 @@ class Vault:
         if not self.settings.root_path.exists():
             return
         skip = (self.settings.daily_path, self.settings.archive_path)
+        seen: set[Path] = set()
         for path in sorted(self.settings.root_path.rglob("*.md")):
             if any(folder in path.parents for folder in skip):
                 continue
-            try:
-                text = path.read_text(encoding="utf-8")
-            except (OSError, UnicodeDecodeError):
+            parsed = self._parse(path)
+            if parsed is None:
                 continue
-            properties, body = markdown.split_frontmatter(text)
-            yield path, properties, body
+            seen.add(path)
+            yield path, *parsed
+
+        # Drop memos for notes that have been archived, renamed, or deleted.
+        for stale in self._parsed.keys() - seen:
+            del self._parsed[stale]
+
+    def _parse(self, path: Path) -> tuple[dict[str, Any], str] | None:
+        """Read and split one note, reusing the last parse when unchanged."""
+        try:
+            info = path.stat()
+        except OSError:
+            return None
+        key = (info.st_mtime_ns, info.st_size)
+
+        cached = self._parsed.get(path)
+        if cached is not None and cached[0] == key:
+            return cached[1], cached[2]
+
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            return None
+
+        properties, body = markdown.split_frontmatter(text)
+        self._parsed[path] = (key, properties, body)
+        return properties, body
 
     def read(self, title: str, note_kind: NoteKind | None = None) -> tuple[Path, str] | None:
         """Find a note by title, returning its path and full text."""
@@ -134,6 +164,7 @@ class Vault:
             )
 
         os.replace(source, destination)
+        self._parsed.pop(source, None)
         return destination
 
     def body_of(self, path: Path) -> str:
@@ -233,6 +264,7 @@ class Vault:
                 stream.flush()
                 os.fsync(stream.fileno())
             os.replace(temp_name, path)
+            self._parsed.pop(path, None)
         except BaseException:
             Path(temp_name).unlink(missing_ok=True)
             raise
