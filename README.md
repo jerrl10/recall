@@ -131,11 +131,23 @@ native layout, so the workflows cannot drift apart.
 | Provider | Status | MCP config | Commands |
 | --- | --- | --- | --- |
 | Claude Code | Verified end-to-end, in daily use | `.mcp.json` | `.claude/commands/` |
-| Codex | Config generated and installer tested; not yet exercised against a live session | `.codex/config.toml` | `~/.codex/prompts/` *(global only)* |
-| OpenCode | Config generated and installer tested; not yet exercised against a live session | `opencode.json` | `.opencode/commands/` |
+| Codex | Config verified; not yet driven from a live session | `.codex/config.toml` | `~/.codex/prompts/` *(global only)* |
+| OpenCode | Config verified; not yet driven from a live session | `opencode.json` | `.opencode/commands/` |
 
-Config formats follow each vendor's current documentation, and the installer is
-covered by CI. If you run Recall on Codex or OpenCode, reports are welcome.
+Three layers are covered by CI:
+
+- **the protocol** — the server is launched as a subprocess and driven through
+  a real MCP handshake, tool discovery, and tool calls by the official client.
+  MCP is the contract, so a server a compliant client can drive is one every
+  compliant client can drive;
+- **the configuration** — each provider's generated config is asserted against
+  that vendor's documented format, including that installing never disturbs
+  servers you already have;
+- **the workflows** — one canonical skill and command set in `ai/` is rendered
+  into each layout, so they cannot drift apart.
+
+What that leaves untested is a live model on Codex or OpenCode actually
+choosing to call the tools. If you run Recall there, reports are welcome.
 
 ## Use
 

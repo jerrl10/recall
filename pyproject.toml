@@ -51,6 +51,7 @@ packages = ["src/recall"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-q --strict-markers"
+markers = ["protocol: drives the server as a real subprocess over stdio"]
 
 [tool.ruff]
 line-length = 100

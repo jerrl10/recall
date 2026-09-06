@@ -34,4 +34,7 @@ jobs:
         run: uv run mypy src tests
 
       - name: Tests
-        run: uv run pytest -v
+        run: uv run pytest -v -m 'not protocol'
+
+      - name: Protocol conformance (real stdio subprocess)
+        run: uv run pytest -v -m protocol
