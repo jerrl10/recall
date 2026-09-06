@@ -10,31 +10,76 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
-  check:
+  quality:
+    name: Format, lint, types
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-
-      - name: Install dependencies
-        run: uv sync --locked
-
+      - run: uv sync --locked
       - name: Format
         run: uv run ruff format --check .
-
       - name: Lint
         run: uv run ruff check .
-
       - name: Types
         run: uv run mypy src tests
 
+  test:
+    name: Test ${{ matrix.os }} / py${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Recall writes to the filesystem and derives filenames from user text,
+        # so Windows is a first-class target rather than an afterthought:
+        # reserved device names, illegal characters, and path separators all
+        # differ there.
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python }}
+      - run: uv sync --locked
       - name: Tests
-        run: uv run pytest -v -m 'not protocol'
-
+        run: uv run pytest -m "not protocol"
       - name: Protocol conformance (real stdio subprocess)
-        run: uv run pytest -v -m protocol
+        run: uv run pytest -m protocol
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - name: Measure
+        run: uv run pytest --cov=recall --cov-report=term-missing
+      - name: Enforce floor
+        run: uv run coverage report --fail-under=85
+
+  install:
+    name: Installer and demo vault
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - name: Dry run every provider
+        run: uv run python scripts/install.py all --dry-run
+      - name: Seed a demo vault
+        run: |
+          uv run python scripts/demo_vault.py "$RUNNER_TEMP/demo"
+          test -f "$RUNNER_TEMP/demo/Recall/Decisions/Retry policy.md"

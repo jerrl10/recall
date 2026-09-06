@@ -35,6 +35,7 @@ dev = [
     "types-PyYAML>=6.0",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
 ]
 
 [build-system]
@@ -52,6 +53,17 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-q --strict-markers"
 markers = ["protocol: drives the server as a real subprocess over stdio"]
+
+[tool.coverage.run]
+source = ["recall"]
+branch = true
+
+[tool.coverage.report]
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
 
 [tool.ruff]
 line-length = 100
