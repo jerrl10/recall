@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Format
+        run: uv run ruff format --check .
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Types
+        run: uv run mypy src
+
+      - name: Server starts and tools register
+        run: |
+          uv run python -c "
+          import asyncio
+          from recall.server import mcp
+          names = {t.name for t in asyncio.run(mcp.list_tools())}
+          expected = {'note_capture', 'note_search', 'note_read', 'note_context', 'vault_health'}
+          assert names == expected, f'tool surface changed: {names ^ expected}'
+          print('tools:', sorted(names))
+          "
+
+      - name: Capture and search against a scratch vault
+        env:
+          RECALL_VAULT_PATH: ${{ runner.temp }}/vault
+        run: |
+          mkdir -p "$RECALL_VAULT_PATH"
+          uv run python -c "
+          import asyncio
+          from recall.server import mcp
+
+          async def call(name, **kwargs):
+              return (await mcp.call_tool(name, kwargs)).structured_content
+
+          async def main():
+              health = await call('vault_health')
+              assert health['ok'] and health['writable'], health
+
+              first = await call(
+                  'note_capture', title='Visibility timeout', kind='concept',
+                  summary='Hidden, not deleted.', body='## How it works\n\nDetail.',
+                  tags=['azure'],
+              )
+              assert first['action'] == 'created', first
+
+              again = await call(
+                  'note_capture', title='Visibility timeout', kind='concept',
+                  summary='More.', body='Max is seven days.',
+              )
+              assert again['action'] == 'updated', again
+
+              found = await call('note_search', query='visibility timeout')
+              assert found['count'] == 1, found
+
+              ctx = await call('note_context', query='visibility timeout')
+              assert 'title:' not in ctx['context'], 'frontmatter leaked into context'
+
+              bad = await call('note_capture', title='  ', kind='concept', summary='x')
+              assert bad['ok'] is False and 'invalid_fields' in bad, bad
+
+              print('capture, merge, search, context, validation: ok')
+
+          asyncio.run(main())
+          "
+
+      - name: Installer preserves existing Codex config
+        run: |
+          mkdir -p "$RUNNER_TEMP/scope/.codex"
+          printf '[mcp_servers.other]\ncommand = "npx"\n' > "$RUNNER_TEMP/scope/.codex/config.toml"
+          uv run python scripts/install.py codex --scope "$RUNNER_TEMP/scope"
+          grep -q 'mcp_servers.other' "$RUNNER_TEMP/scope/.codex/config.toml"
+          grep -q 'mcp_servers.recall' "$RUNNER_TEMP/scope/.codex/config.toml"
+          echo "existing server survived install"
