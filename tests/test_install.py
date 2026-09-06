@@ -132,3 +132,40 @@ def test_agents_md_carries_the_skill_without_its_frontmatter(scope: Path) -> Non
     assert action.content is not None
     assert not action.content.lstrip().startswith("---")
     assert "note_search" in action.content
+
+
+class TestTomlEscaping:
+    """Regression: Windows paths were interpolated raw into TOML basic strings,
+    so 'D:\\a\\recall' produced the invalid escapes \\a and \\r and the whole
+    generated config failed to parse. Installing on Windows silently did
+    nothing, because the safety check correctly refused to write a broken file.
+    """
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            r"D:\a\recall\recall",
+            r"C:\Users\me\Documents\Obsidian\My Vault",
+            r"C:\new\file\brave",  # \n, \f, \b are all escape-adjacent
+            "/unix/style/path",
+            'contains "quotes"',
+            "contains\ttab",
+            "trailing backslash\\",
+        ],
+    )
+    def test_values_round_trip_through_a_toml_parser(self, value: str) -> None:
+        parsed = tomllib.loads(f"key = {install.toml_string(value)}")
+        assert parsed["key"] == value
+
+    def test_a_windows_style_repo_path_produces_parseable_config(
+        self, scope: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(install, "REPO", Path(r"D:\a\recall\recall"))
+        actions = install.plan_codex(r"C:\Users\me\vault", scope, use_uv=True)
+        config_action = next(a for a in actions if a.path.name == "config.toml")
+
+        assert config_action.content is not None
+        parsed = tomllib.loads(config_action.content)
+        entry = parsed["mcp_servers"]["recall"]
+        assert r"D:\a\recall\recall" in entry["args"]
+        assert entry["env"]["RECALL_VAULT_PATH"] == r"C:\Users\me\vault"

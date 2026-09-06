@@ -147,11 +147,15 @@ def plan_codex(vault: str | None, scope: Path, use_uv: bool) -> list[Action]:
     command, args = server_command(use_uv, scope)
     lines = [
         "[mcp_servers.recall]",
-        f'command = "{command}"',
-        "args = [" + ", ".join(f'"{arg}"' for arg in args) + "]",
+        f"command = {toml_string(command)}",
+        "args = [" + ", ".join(toml_string(arg) for arg in args) + "]",
     ]
     if vault:
-        lines += ["", "[mcp_servers.recall.env]", f'RECALL_VAULT_PATH = "{vault}"']
+        lines += [
+            "",
+            "[mcp_servers.recall.env]",
+            f"RECALL_VAULT_PATH = {toml_string(vault)}",
+        ]
     block = "\n".join(lines) + "\n"
 
     actions = [
@@ -176,6 +180,36 @@ PLANNERS = {"claude": plan_claude, "codex": plan_codex, "opencode": plan_opencod
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+#: TOML basic-string escapes, per the spec.
+_TOML_ESCAPES = {
+    "\\": "\\\\",
+    '"': '\\"',
+    "\b": "\\b",
+    "\t": "\\t",
+    "\n": "\\n",
+    "\f": "\\f",
+    "\r": "\\r",
+}
+
+
+def toml_string(value: str) -> str:
+    """Quote a value as a TOML basic string.
+
+    Windows paths are the reason this exists rather than an f-string: a raw
+    ``D:\\a\\recall`` interpolated between quotes yields ``\\a`` and ``\\r``,
+    which are not valid TOML escapes, so the whole file fails to parse.
+    """
+    rendered = []
+    for char in value:
+        if char in _TOML_ESCAPES:
+            rendered.append(_TOML_ESCAPES[char])
+        elif ord(char) < 0x20 or ord(char) == 0x7F:
+            rendered.append(f"\\u{ord(char):04X}")
+        else:
+            rendered.append(char)
+    return '"' + "".join(rendered) + '"'
 
 
 def _codex_config_action(path: Path, block: str) -> Action:
