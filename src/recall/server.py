@@ -12,7 +12,7 @@ from datetime import date
 from typing import Annotated, Any
 
 from mcp.server.mcpserver import MCPServer
-from pydantic import Field
+from pydantic import Field, ValidationError
 
 from . import __version__, templates
 from .config import Settings, load_settings
@@ -51,6 +51,23 @@ def _context() -> tuple[Settings, Vault, Search]:
     return _settings, _vault, _search
 
 
+def _invalid(exc: ValidationError) -> dict[str, Any]:
+    """Turn a validation failure into something the caller can act on.
+
+    An opaque tool error tells a model only that something went wrong; naming
+    the field and the constraint lets it correct the call and retry.
+    """
+    problems = [
+        {
+            "field": ".".join(str(part) for part in error["loc"]) or "(root)",
+            "problem": error["msg"],
+        }
+        for error in exc.errors()
+    ]
+    summary = "; ".join(f"{item['field']}: {item['problem']}" for item in problems)
+    return {"ok": False, "error": f"invalid input — {summary}", "invalid_fields": problems}
+
+
 # ---------------------------------------------------------------------------
 # Tools
 # ---------------------------------------------------------------------------
@@ -86,16 +103,19 @@ def note_capture(
     {structure}
     """
     settings, vault, _ = _context()
-    note = Note(
-        title=title,
-        kind=kind,
-        summary=summary,
-        body=body,
-        tags=tags or [],
-        projects=projects or [],
-        related=related or [],
-        source=source,
-    )
+    try:
+        note = Note(
+            title=title,
+            kind=kind,
+            summary=summary,
+            body=body,
+            tags=tags or [],
+            projects=projects or [],
+            related=related or [],
+            source=source,
+        )
+    except ValidationError as exc:
+        return _invalid(exc)
 
     try:
         result = vault.write_note(note)
