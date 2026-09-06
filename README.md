@@ -238,10 +238,22 @@ and [`docs/architecture.md`](docs/architecture.md) for the module map.
 uv sync
 uv run ruff format .
 uv run ruff check .
-uv run mypy src
+uv run mypy src tests
+uv run pytest
 ```
 
-Contributor guidance lives in [CLAUDE.md](CLAUDE.md).
+Optionally, run the same checks before each commit:
+
+```bash
+uv run pre-commit install
+```
+
+CI runs across Linux, macOS, and Windows on Python 3.12 and 3.13, plus MCP
+protocol conformance against a real stdio subprocess and a coverage floor.
+
+[CONTRIBUTING.md](CONTRIBUTING.md) covers the constraints worth knowing before
+you write code; [CLAUDE.md](CLAUDE.md) is the condensed version an AI assistant
+loads automatically.
 
 ## Status
 

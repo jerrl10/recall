@@ -1,0 +1,68 @@
+name: Bug report
+description: Something Recall does is wrong
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please don't paste note content. A title and a description of the
+        shape of the note is enough to reproduce most things.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you expected, and what happened instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      placeholder: |
+        1. Capture a note titled "..."
+        2. Search for "..."
+        3. The result is ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server output
+      description: >
+        Run with RECALL_LOG_LEVEL=DEBUG and paste the stderr output.
+        Check it for anything you would rather not publish.
+      render: text
+
+  - type: input
+    id: version
+    attributes:
+      label: Recall version or commit
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options: [macOS, Linux, Windows]
+    validations:
+      required: true
+
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: "3.12.7"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: client
+    attributes:
+      label: MCP client
+      options: [Claude Code, Codex, OpenCode, MCP Inspector, Other]
+    validations:
+      required: true

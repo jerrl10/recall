@@ -1,0 +1,32 @@
+name: Feature request
+description: Suggest something Recall should do
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Recall has a few deliberate constraints — no database, nothing is ever
+        deleted, no LLM in the server, and a small tool surface. They are
+        explained in [CONTRIBUTING.md](../../CONTRIBUTING.md) and
+        [docs/decisions/](../../docs/decisions). Proposals that work within
+        them are much more likely to land.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do that is awkward today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you have in mind
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you have already tried or considered
