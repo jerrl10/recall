@@ -104,9 +104,6 @@ class Vault:
         _, body = markdown.split_frontmatter(text)
         return body
 
-    def exists(self, note_kind: NoteKind, title: str) -> bool:
-        return self.path_for(note_kind, title).exists()
-
     # ------------------------------------------------------------------
     # Writing
     # ------------------------------------------------------------------

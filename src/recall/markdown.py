@@ -24,7 +24,6 @@ _KEY_ORDER = (
     "tags",
     "projects",
     "source",
-    "aliases",
 )
 
 

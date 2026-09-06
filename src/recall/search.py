@@ -114,19 +114,20 @@ class Search:
                 continue
 
             title = str(properties.get("title") or title_from_filename(path.name))
+            summary = _summary_of(body)
             documents.append(
                 {
                     "path": path,
                     "title": title,
                     "kind": kind_value,
                     "tags": note_tags,
-                    "summary": _summary_of(body),
+                    "summary": summary,
                     "body": body,
                     "updated": properties.get("updated", ""),
                     "tokens": {
                         "title": Counter(tokenize(title)),
                         "tags": Counter(tokenize(" ".join(note_tags))),
-                        "summary": Counter(tokenize(_summary_of(body))),
+                        "summary": Counter(tokenize(summary)),
                         "body": Counter(tokenize(body)),
                     },
                 }
