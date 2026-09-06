@@ -12,6 +12,7 @@ import logging
 import sys
 from collections.abc import Callable
 from datetime import date
+from pathlib import Path
 from typing import Annotated, Any
 
 from mcp.server.mcpserver import MCPServer
@@ -90,6 +91,16 @@ def observed[**P](fn: Callable[P, dict[str, Any]]) -> Callable[P, dict[str, Any]
             return result
 
     return wrapper
+
+
+def _relative(path: Path, root: Path) -> str:
+    """A vault-relative path, always with forward slashes.
+
+    Tool output is read by clients and models on every platform, so it should
+    not change shape with the host's path separator. Backslashes would also be
+    re-escaped by the JSON encoder, making the value harder to read.
+    """
+    return path.relative_to(root).as_posix()
 
 
 def _invalid(exc: ValidationError) -> dict[str, Any]:
@@ -219,8 +230,8 @@ def note_capture(
         "kind": result.kind.value,
         "wiki_link": result.wiki_link,
         "action": "created" if result.created else "updated",
-        "relative_path": str(result.path.relative_to(settings.vault_path)),
-        "daily_note": str(daily_path.relative_to(settings.vault_path)) if daily_path else None,
+        "relative_path": _relative(result.path, settings.vault_path),
+        "daily_note": _relative(daily_path, settings.vault_path) if daily_path else None,
         "related_notes": related_notes,
         **(
             {
@@ -264,7 +275,7 @@ def note_search(
                 "score": hit.score,
                 "excerpt": hit.excerpt,
                 "tags": hit.tags,
-                "relative_path": str(hit.path.relative_to(settings.vault_path)),
+                "relative_path": _relative(hit.path, settings.vault_path),
             }
             for hit in hits
         ],
@@ -286,7 +297,7 @@ def note_read(
     return {
         "ok": True,
         "title": title,
-        "relative_path": str(path.relative_to(settings.vault_path)),
+        "relative_path": _relative(path, settings.vault_path),
         "content": text,
     }
 
@@ -319,7 +330,7 @@ def note_archive(
     return {
         "ok": True,
         "title": title,
-        "archived_to": str(destination.relative_to(settings.vault_path)),
+        "archived_to": _relative(destination, settings.vault_path),
         "note": "moved, not deleted — restore it by moving the file back in Obsidian",
     }
 
