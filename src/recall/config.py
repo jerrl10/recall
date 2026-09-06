@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     )
     max_search_results: int = Field(default=10, ge=1, le=100)
     excerpt_chars: int = Field(default=320, ge=80, le=2000)
+    context_char_budget: int = Field(
+        default=8000,
+        ge=500,
+        le=100_000,
+        description="Hard cap on the text note_context returns, across all notes.",
+    )
 
     @field_validator("vault_path")
     @classmethod

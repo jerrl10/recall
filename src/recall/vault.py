@@ -91,6 +91,19 @@ class Vault:
                 return path, path.read_text(encoding="utf-8")
         return None
 
+    def body_of(self, path: Path) -> str:
+        """Read one note's Markdown body, without its frontmatter.
+
+        Frontmatter is machine bookkeeping. Feeding it to a model wastes
+        context on YAML that says nothing the surrounding fields do not.
+        """
+        try:
+            text = self._guard(path).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError, VaultError):
+            return ""
+        _, body = markdown.split_frontmatter(text)
+        return body
+
     def exists(self, note_kind: NoteKind, title: str) -> bool:
         return self.path_for(note_kind, title).exists()
 
