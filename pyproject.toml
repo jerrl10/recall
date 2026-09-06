@@ -29,7 +29,13 @@ Homepage = "https://github.com/jerrl10/recall"
 Issues = "https://github.com/jerrl10/recall/issues"
 
 [dependency-groups]
-dev = ["ruff>=0.6", "mypy>=1.11", "types-PyYAML>=6.0"]
+dev = [
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "types-PyYAML>=6.0",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -41,6 +47,11 @@ packages = ["src/recall"]
 [tool.hatch.build.targets.wheel.force-include]
 "src/recall/py.typed" = "recall/py.typed"
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-q --strict-markers"
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
@@ -51,8 +62,13 @@ select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["src"]
+files = ["src", "tests"]
 
 [[tool.mypy.overrides]]
 module = ["mcp.*"]
+ignore_missing_imports = true
+
+# scripts/ is not an installed package; tests import it via sys.path.
+[[tool.mypy.overrides]]
+module = ["install"]
 ignore_missing_imports = true
