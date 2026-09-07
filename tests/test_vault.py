@@ -191,3 +191,67 @@ class TestParseCache:
 
         vault.archive("Visibility timeout")
         assert list(vault.iter_notes()) == []
+
+
+class TestSearchScope:
+    """Reading and writing are separate: search can cover the whole vault,
+    but writes never leave the Recall folder."""
+
+    def _pre_existing(self, vault: Vault) -> Path:
+        """A note the user already had, outside Recall's folder."""
+        folder = vault.settings.vault_path / "Engineering"
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / "Kafka rebalancing.md"
+        path.write_text(
+            "---\ntitle: Kafka rebalancing\ntags:\n  - kafka\n---\n\n"
+            "# Kafka rebalancing\n\nConsumer group rebalance stops the world.\n",
+            encoding="utf-8",
+        )
+        return path
+
+    def test_recall_scope_ignores_the_rest_of_the_vault(self, vault: Vault) -> None:
+        self._pre_existing(vault)
+        vault.write_note(make_note())
+        titles = [p.get("title") for _, p, _ in vault.iter_notes()]
+        assert titles == ["Visibility timeout"]
+
+    def test_vault_scope_finds_notes_recall_never_wrote(self, vault: Vault) -> None:
+        self._pre_existing(vault)
+        vault.write_note(make_note())
+        vault.settings.search_scope = "vault"
+
+        titles = {p.get("title") for _, p, _ in vault.iter_notes()}
+        assert titles == {"Visibility timeout", "Kafka rebalancing"}
+
+    def test_vault_scope_still_writes_only_inside_recall(self, vault: Vault) -> None:
+        vault.settings.search_scope = "vault"
+        result = vault.write_note(make_note())
+        assert vault.settings.root_path in result.path.parents
+
+    def test_excluded_folders_are_skipped_at_any_depth(self, vault: Vault) -> None:
+        vault.settings.search_scope = "vault"
+        for folder in ("Templates", ".trash", "Projects/Templates"):
+            path = vault.settings.vault_path / folder / "Skip me.md"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("# Skip me\n\nqueue queue queue\n", encoding="utf-8")
+
+        titles = [p.get("title") or path.stem for path, p, _ in vault.iter_notes()]
+        assert "Skip me" not in titles
+
+    def test_archived_and_daily_notes_stay_excluded_in_vault_scope(self, vault: Vault) -> None:
+        vault.settings.search_scope = "vault"
+        result = vault.write_note(make_note())
+        vault.log_daily([result])
+        vault.archive("Visibility timeout")
+
+        assert list(vault.iter_notes()) == []
+
+    def test_the_duplicate_guard_only_considers_notes_recall_owns(self, vault: Vault) -> None:
+        """A note Recall did not write cannot be merged into, so blocking a
+        capture against it would leave the client with no way forward."""
+        self._pre_existing(vault)
+        vault.settings.search_scope = "vault"
+        assert vault.titles() == []
+
+        vault.write_note(make_note())
+        assert vault.titles() == ["Visibility timeout"]

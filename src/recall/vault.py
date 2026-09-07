@@ -65,19 +65,29 @@ class Vault:
     # ------------------------------------------------------------------
 
     def iter_notes(self) -> Iterator[tuple[Path, dict[str, Any], str]]:
-        """Yield every note under the Recall root as (path, properties, body).
+        """Yield every searchable note as (path, properties, body).
 
-        Daily logs are skipped: they are an index of captures, not knowledge,
-        and including them would make every search match today's date.
-        Archived notes are skipped because withdrawing a note is the whole
-        point of archiving it.
+        Reads from ``search_path``, which is the whole vault when
+        ``RECALL_SEARCH_SCOPE=vault`` and only Recall's own folder otherwise.
+
+        Three things are always skipped: daily logs, because they index
+        captures rather than holding knowledge and would make every search
+        match today's date; archived notes, because withdrawing a note is the
+        entire point of archiving it; and any folder named in
+        ``search_exclude``, at any depth.
         """
-        if not self.settings.root_path.exists():
+        search_root = self.settings.search_path
+        if not search_root.exists():
             return
+
         skip = (self.settings.daily_path, self.settings.archive_path)
+        excluded = {name.casefold() for name in self.settings.search_exclude}
         seen: set[Path] = set()
-        for path in sorted(self.settings.root_path.rglob("*.md")):
+
+        for path in sorted(search_root.rglob("*.md")):
             if any(folder in path.parents for folder in skip):
+                continue
+            if any(part.casefold() in excluded for part in path.parts):
                 continue
             parsed = self._parse(path)
             if parsed is None:
@@ -88,6 +98,26 @@ class Vault:
         # Drop memos for notes that have been archived, renamed, or deleted.
         for stale in self._parsed.keys() - seen:
             del self._parsed[stale]
+
+    def iter_owned(self) -> Iterator[tuple[Path, dict[str, Any], str]]:
+        """Yield only notes Recall itself wrote.
+
+        The duplicate guard uses this rather than the full search scope: a
+        note Recall did not create cannot be merged into, since writes never
+        leave ``root_path``. Blocking a capture against a file the client has
+        no way to extend would be a dead end. Content overlap with such notes
+        is still surfaced, as advice.
+        """
+        root = self.settings.root_path
+        if not root.exists():
+            return
+        skip = (self.settings.daily_path, self.settings.archive_path)
+        for path in sorted(root.rglob("*.md")):
+            if any(folder in path.parents for folder in skip):
+                continue
+            parsed = self._parse(path)
+            if parsed is not None:
+                yield path, *parsed
 
     def _parse(self, path: Path) -> tuple[dict[str, Any], str] | None:
         """Read and split one note, reusing the last parse when unchanged."""
@@ -131,10 +161,10 @@ class Vault:
         return self.path_for(note_kind, title).exists()
 
     def titles(self) -> list[str]:
-        """Every live note title, for near-duplicate detection."""
+        """Titles of notes Recall owns, for near-duplicate detection."""
         return [
             str(properties.get("title") or title_from_filename(path.name))
-            for path, properties, _ in self.iter_notes()
+            for path, properties, _ in self.iter_owned()
         ]
 
     def archive(self, title: str, note_kind: NoteKind | None = None) -> Path | None:

@@ -401,6 +401,7 @@ def vault_health() -> dict[str, Any]:
         "ok": True,
         "vault_reachable": settings.vault_path.is_dir(),
         "recall_folder": settings.root,
+        "search_scope": settings.search_scope,
         "recall_folder_exists": settings.root_path.is_dir(),
         "writable": _writable(settings),
         "note_counts": vault.stats(),

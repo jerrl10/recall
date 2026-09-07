@@ -190,8 +190,26 @@ YourVault/
     └── Archive/      withdrawn notes, kept out of search
 ```
 
-Topic notes hold the knowledge; the daily log gives you the timeline. Recall
-only ever writes beneath its own folder.
+Topic notes hold the knowledge; the daily log gives you the timeline.
+
+### Reading and writing are separate
+
+Recall **only ever writes** beneath its own folder. What it *reads* is your
+choice:
+
+| `RECALL_SEARCH_SCOPE` | Recall searches |
+| --- | --- |
+| `recall` (default) | Only notes Recall wrote |
+| `vault` | Your whole vault |
+
+Set it to `vault` and everything you have already written becomes recallable
+on day one, instead of after weeks of building a corpus. Notes Recall did not
+create are read-only to it — they can be found, quoted, and linked, never
+modified.
+
+Keep the default if your vault mixes work with anything personal: `vault`
+scope means an assistant can surface any note in it. `RECALL_SEARCH_EXCLUDE`
+skips folders by name at any depth.
 
 ## Configuration
 
@@ -203,6 +221,8 @@ Set via environment or a `.env` file — see [`.env.example`](.env.example).
 | `RECALL_ROOT` | `Recall` | Folder inside the vault that Recall owns |
 | `RECALL_DAILY_FOLDER` | `Daily` | Subfolder for dated logs |
 | `RECALL_ARCHIVE_FOLDER` | `Archive` | Subfolder for withdrawn notes |
+| `RECALL_SEARCH_SCOPE` | `recall` | `recall` or `vault` — see below |
+| `RECALL_SEARCH_EXCLUDE` | `[".obsidian", ".trash", "Templates"]` | Folders never searched |
 | `RECALL_MAX_SEARCH_RESULTS` | `10` | Default result cap |
 | `RECALL_EXCERPT_CHARS` | `320` | Search excerpt length |
 | `RECALL_CONTEXT_CHAR_BUDGET` | `8000` | Hard cap on text `note_context` returns |

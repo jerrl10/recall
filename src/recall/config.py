@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -35,6 +36,17 @@ class Settings(BaseSettings):
     archive_folder: str = Field(
         default="Archive",
         description="Subfolder holding notes withdrawn from search.",
+    )
+    search_scope: Literal["recall", "vault"] = Field(
+        default="recall",
+        description=(
+            "'recall' searches only notes Recall wrote. 'vault' searches the "
+            "whole vault, so notes you already had are recallable too."
+        ),
+    )
+    search_exclude: list[str] = Field(
+        default_factory=lambda: [".obsidian", ".trash", "Templates"],
+        description="Folder names skipped when searching, at any depth.",
     )
     log_level: str = Field(
         default="INFO",
@@ -76,6 +88,18 @@ class Settings(BaseSettings):
     def archive_path(self) -> Path:
         """Absolute path to the archive folder."""
         return self.root_path / self.archive_folder
+
+    @property
+    def search_path(self) -> Path:
+        """Where search reads from.
+
+        Reading and writing are deliberately separate. Most people install
+        Recall into a vault that already holds years of notes; searching only
+        what Recall itself wrote would make it useless until it had built up
+        its own corpus. Writing stays confined to ``root_path`` regardless —
+        Recall never modifies a note it did not create.
+        """
+        return self.vault_path if self.search_scope == "vault" else self.root_path
 
     def validate_vault(self) -> None:
         """Fail fast on a misconfigured vault.
