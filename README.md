@@ -115,7 +115,25 @@ cd recall
 uv sync
 ```
 
-Then install into your assistant — run this from the project you want memory in:
+> Packaging for `uvx obsidian-recall` is in place and the release workflow is
+> ready; it is not on PyPI yet. Install from source until then.
+
+Point it at your vault — this finds your Obsidian vaults for you:
+
+```bash
+uv run recall setup
+```
+
+It asks which vault to use and whether Recall may read your existing notes
+(see [reading and writing](#reading-and-writing-are-separate)), then writes a
+config file. If something later stops working:
+
+```bash
+uv run recall doctor
+```
+
+Then register Recall with your assistant — run this from the project you want
+memory in:
 
 ```bash
 # Claude Code

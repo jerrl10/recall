@@ -1,5 +1,5 @@
 [project]
-name = "recall-mcp"
+name = "obsidian-recall"
 version = "0.1.0"
 description = "Durable engineering memory for AI coding assistants — captures conversations into a structured Obsidian vault"
 readme = "README.md"
