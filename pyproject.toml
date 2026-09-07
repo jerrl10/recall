@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 [project.scripts]
-recall = "recall.server:main"
+recall = "recall.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/jerrl10/recall"

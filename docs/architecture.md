@@ -27,7 +27,10 @@ No database. No index. No cache. The vault is the state.
 
 | Module | Responsibility |
 | --- | --- |
+| `cli.py` | `setup`, `doctor`, and `serve`; a bare `recall` serves |
+| `discovery.py` | Finding Obsidian vaults from its own registry |
 | `config.py` | Settings from `RECALL_*` env; resolves and validates the vault once |
+| `log.py` | Structured logging to stderr; never note content |
 | `models.py` | `Note`, `NoteKind`, `SearchHit`, `CaptureResult` — validated at the boundary |
 | `markdown.py` | Obsidian-flavoured Markdown: frontmatter, callouts, links, excerpts |
 | `templates.py` | The `##` section structure each kind of note uses |
