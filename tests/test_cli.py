@@ -204,3 +204,140 @@ def test_no_arguments_defaults_to_serving(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setattr(cli, "command_serve", fake_serve)
     assert cli.main([]) == 0
     assert served
+
+
+class TestInteractiveChoice:
+    """The prompts a first-time user actually meets."""
+
+    def test_choosing_a_vault_by_number(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        first, second = tmp_path / "One", tmp_path / "Two"
+        for path in (first, second):
+            (path / ".obsidian").mkdir(parents=True)
+        monkeypatch.setattr("builtins.input", lambda _="": "2")
+
+        assert cli._choose_vault([first, second]) == second
+
+    def test_pressing_enter_takes_the_most_recent_vault(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        first, second = tmp_path / "One", tmp_path / "Two"
+        monkeypatch.setattr("builtins.input", lambda _="": "")
+
+        assert cli._choose_vault([first, second]) == first
+
+    def test_choosing_somewhere_else_prompts_for_a_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        elsewhere = tmp_path / "Elsewhere"
+        answers = iter(["2", str(elsewhere)])
+        monkeypatch.setattr("builtins.input", lambda _="": next(answers))
+
+        assert cli._choose_vault([tmp_path / "One"]) == elsewhere.resolve()
+
+    def test_an_out_of_range_choice_gives_up_rather_than_guessing(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("builtins.input", lambda _="": "99")
+        assert cli._choose_vault([tmp_path / "One"]) is None
+
+    def test_nonsense_input_gives_up(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("builtins.input", lambda _="": "banana")
+        assert cli._choose_vault([tmp_path / "One"]) is None
+
+    def test_with_no_candidates_it_asks_outright(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("builtins.input", lambda _="": str(tmp_path / "Typed"))
+        assert cli._choose_vault([]) == (tmp_path / "Typed").resolve()
+
+    def test_an_empty_answer_with_no_candidates_chooses_nothing(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("builtins.input", lambda _="": "")
+        assert cli._choose_vault([]) is None
+
+    @pytest.mark.parametrize(
+        ("answer", "expected"),
+        [("1", "vault"), ("2", "recall"), ("", "vault"), ("anything", "vault")],
+    )
+    def test_scope_question(
+        self, answer: str, expected: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Only an explicit '2' opts out of vault scope."""
+        monkeypatch.setattr("builtins.input", lambda _="": answer)
+        assert cli._choose_scope() == expected
+
+    def test_setup_stops_when_no_vault_is_chosen(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        monkeypatch.setattr(discovery, "discover", list)
+        monkeypatch.setattr("builtins.input", lambda _="": "")
+        monkeypatch.chdir(tmp_path)
+
+        assert cli.main(["setup"]) == 1
+        assert not (tmp_path / ".env").exists()
+
+    def test_setup_reports_a_write_failure_with_the_values_to_set_by_hand(
+        self,
+        obsidian_vault: Path,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        def refuse(*_: object, **__: object) -> None:
+            raise OSError(13, "Permission denied")
+
+        monkeypatch.setattr(Path, "write_text", refuse)
+        code = cli.main(
+            [
+                "setup",
+                "--vault",
+                str(obsidian_vault),
+                "--scope",
+                "vault",
+                "--output",
+                str(tmp_path / ".env"),
+            ]
+        )
+
+        assert code == 1
+        err = capsys.readouterr().err
+        assert "RECALL_VAULT_PATH=" in err, "must tell the user what to set manually"
+
+
+class TestNearbySearch:
+    def test_vaults_are_found_in_the_usual_places(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        (tmp_path / "Documents" / "Notes" / ".obsidian").mkdir(parents=True)
+        monkeypatch.setattr(Path, "home", classmethod(lambda _: tmp_path))
+
+        assert tmp_path / "Documents" / "Notes" in discovery.search_nearby()
+
+    def test_a_directory_without_obsidian_is_not_a_vault(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        (tmp_path / "Documents" / "Plain").mkdir(parents=True)
+        monkeypatch.setattr(Path, "home", classmethod(lambda _: tmp_path))
+
+        assert discovery.search_nearby() == []
+
+    def test_discover_merges_both_sources_without_duplicates(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        shared = tmp_path / "Documents" / "Shared"
+        (shared / ".obsidian").mkdir(parents=True)
+        monkeypatch.setattr(Path, "home", classmethod(lambda _: tmp_path))
+        monkeypatch.setattr(discovery, "registered_vaults", lambda: [shared])
+
+        assert discovery.discover() == [shared]
+
+    def test_discover_works_with_no_registry_at_all(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(Path, "home", classmethod(lambda _: tmp_path))
+        monkeypatch.setattr(discovery, "registered_vaults", list)
+
+        assert discovery.discover() == []
